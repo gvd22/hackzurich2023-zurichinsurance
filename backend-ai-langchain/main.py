@@ -16,13 +16,14 @@ QDRANT_LOCATION = "https://hackzurich23-vectordb-emcg5a6iia-oa.a.run.app/"
 QDRANT_PORT = 443
 PATH_TO_PDFS = "./docs/"
 PDF_MASK = "*.pdf"
+CHUNK_SIZE = 600
 
 
 def list_pdf_files(list_pattern):
     return glob.glob(list_pattern)
 
 
-def convert_to_text(paths):
+def convert_files_to_text(paths):
     texts = []
     for i, path in enumerate(paths):
         text = ""
@@ -38,9 +39,22 @@ def convert_to_text(paths):
     return texts
 
 
+def convert_file_to_text(path):
+    print(f"Reading file {path}...", "\n")
+    text = ""
+    with open(path, "rb") as file:
+        reader = PdfReader(file)
+        for page in reader.pages:
+            page_text = page.extract_text()
+            if "table of contents" in page_text:
+                continue
+            text += page_text
+    text = text.replace("\t", " ")
+    return text
+
+
 def chunk_text(text):
-    chunk_size = 600
-    text_splitter = CharacterTextSplitter(separator="\n", chunk_size=chunk_size, chunk_overlap=200, length_function=len)
+    text_splitter = CharacterTextSplitter(separator="\n", chunk_size=CHUNK_SIZE, chunk_overlap=200, length_function=len)
     return text_splitter.split_text(text)
 
 
@@ -53,7 +67,6 @@ def chunk_texts(texts):
 
 def generate_vectors(text_chunks, embeddings: OpenAIEmbeddings):
     points = []
-
     for chunk in text_chunks:
         print(f"Generating vector for the chunk of length {len(chunk)}", "\n")
         embed_result = embeddings.embed_query(chunk.replace("\n", " "))
@@ -62,7 +75,7 @@ def generate_vectors(text_chunks, embeddings: OpenAIEmbeddings):
 
 
 def upsert_vectors(vectors, client: QdrantClient):
-    print("Upserting the vectors...", "\n")
+    print(f"Upserting {len(vectors)} vectors...", "\n")
     client.upsert(collection_name=QDRANT_COLLECTION_NAME, wait=True, points=vectors)
 
 
@@ -72,7 +85,8 @@ def initialise_qdrant_collection(name, location, port):
         client.get_collection(collection_name=name)
     except:
         print(f"Collection {name} doesn't exist. Creating...", "\n")
-        client.recreate_collection(collection_name=name, vectors_config=VectorParams(size=1536, distance=Distance.COSINE))
+        client.recreate_collection(collection_name=name,
+                                   vectors_config=VectorParams(size=1536, distance=Distance.COSINE))
     return client
 
 
@@ -94,32 +108,33 @@ def answer_with_context(query, embeddings: OpenAIEmbeddings, chat: ChatOpenAI, c
     return answer.content
 
 
+def process_file(path, embeddings: OpenAIEmbeddings, client: QdrantClient):
+    print(f"Textifying the file {path}...", "\n")
+    text = convert_file_to_text(path)
+    print("Chunking text data...", "\n")
+    chunks = chunk_text(text)
+    print(f"Generating vectors for file {path}...", "\n")
+    vectors = generate_vectors(chunks, embeddings)
+    print(f"Upserting the vectors to Qdrant for file {path}...", "\n")
+    upsert_vectors(vectors, client)
+    print(f"File {path} done.", "\n")
+
+
 def main():
     load_dotenv()
 
     openai_api_key = os.getenv("OPENAI_PRIVATE_KEY")
-
-    print("Reading files...", "\n")
-    text_data = convert_to_text(list_pdf_files(PATH_TO_PDFS + PDF_MASK))
-    print("Chunking text data...", "\n")
-    chunks = chunk_texts(text_data)
     embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
-    #chat = ChatOpenAI(temperature=0.4, openai_api_key=openai_api_key)
-    print("Generating vectors...", "\n")
-    vectors = generate_vectors(chunks, embeddings)
-
     client = initialise_qdrant_collection(QDRANT_COLLECTION_NAME, QDRANT_LOCATION, QDRANT_PORT)
-    print("Upserting the vectors to Qdrant...", "\n")
-    upsert_vectors(vectors, client)
 
-    print("Vectors uploaded.")
+    print(f"Enumerating PDF files in {PATH_TO_PDFS}...", "\n")
+    paths = list_pdf_files(PATH_TO_PDFS + PDF_MASK)
+    print(f"PDF files found: {len(paths)}. Processing...", "\n")
+    for path in paths:
+        process_file(path, embeddings, client)
 
-    #question = "How am I insured?"
-    #answer = answer_with_context(question, embeddings, chat, client, QDRANT_COLLECTION_NAME)
-    #print("The answer is: ", answer, "\n")
+    print("All files done. Vectors uploaded.")
 
 
 if __name__ == '__main__':
     main()
-
-
