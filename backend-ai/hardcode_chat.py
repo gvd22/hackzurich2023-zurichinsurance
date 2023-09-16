@@ -8,10 +8,34 @@ from datetime import datetime
 # Example dummy function hard coded to return the same weather
 # In production, this could be your backend API or an external API
 from dotenv import load_dotenv
+from langchain import embeddings
+from langchain.embeddings import OpenAIEmbeddings
+from qdrant_client.grpc import PointStruct
+
 load_dotenv()
 
 openai.api_key = os.getenv("OPENAI_KEY")
+openai_api_key = os.getenv("OPENAI_KEY")
 user_chat_history = []
+
+context = ""
+
+from qdrant_client import QdrantClient
+
+# qdrant_client = QdrantClient(
+#     url="hackzurich23-vectordb-emcg5a6iia-oa.a.run.app",
+#     api_key="<your-api-key>",
+# )
+
+#qdrant_client = QdrantClient('https://hackzurich23-vectordb-emcg5a6iia-oa.a.run.app')
+
+location = "https://hackzurich23-vectordb-emcg5a6iia-oa.a.run.app"
+port = 443
+
+client = QdrantClient(location=location, port=port)
+
+embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
+
 
 def aktuelles_datum_formatiert():
     jetzt = datetime.now()
@@ -41,6 +65,24 @@ def check_args(function, args):
             return False
 
     return True
+
+
+
+def qdrant_search_api(seacrchquestion):
+    embedded_query = embeddings.embed_query(seacrchquestion)
+    hits = client.search(
+        collection_name="zurizap",
+        query_vector=embedded_query,
+        limit=10  # Return 5 closest points
+    )
+    prompt = ""
+    for result in hits:
+        prompt += result.payload['text']
+
+    concatenated_answer = " ".join([prompt])
+
+    return  concatenated_answer
+
 
 functions = [
     {
@@ -76,8 +118,10 @@ available_functions = {
         }
 
 
+
 def run_conversation(user_input,functions,available_functions):
-    # Step 1: send the conversation and available functions to GPT
+    context = qdrant_search_api(user_input)
+
     messages = [
         {"role": "system",
          "content":
@@ -92,14 +136,16 @@ def run_conversation(user_input,functions,available_functions):
              "All questions on this topic ZüriZap must always ground on the basis of information from the Knowledgebase."
              "Answers should always be answered on the basis of the information provided to you. "
              "It is important that the answer be short and precise."
-
+             "YOU SHOULD ALWAYS ANSWER BASED ON THIS INFORMATION IF YOU DONT HAVE ENOUGH INFORMATION THEN ASKE A QUESTION TO THE QDRANT DATABASE:"
+             f"{context}"
          },
-
-        {"role": "user", "content": user_input }
     ]
 
+    # Step 1: send the conversation and available functions to GPT
+    messages.append({"role": "user", "content": user_input})
+
     response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo-0613",
+        model="gpt-4-0613",
         messages=messages,
         functions=functions,
         function_call="auto",  # auto is default, but we'll be explicit

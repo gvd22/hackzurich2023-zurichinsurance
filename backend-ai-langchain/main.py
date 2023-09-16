@@ -63,7 +63,8 @@ def upsert_vectors(vectors, client: QdrantClient):
 
 
 def initialise_qdrant_collection(name, location, port):
-    client = QdrantClient(location=location, port=port)
+    client = QdrantClient('http://localhost:6333')
+    #client = QdrantClient(location=location, port=port)
     client.recreate_collection(collection_name=name,
                                vectors_config=VectorParams(size=1536, distance=Distance.COSINE))
     return client
@@ -90,7 +91,7 @@ def answer_with_context(query, embeddings: OpenAIEmbeddings, chat: ChatOpenAI, c
 def main():
     load_dotenv()
 
-    openai_api_key = os.getenv("OPENAI_PRIVATE_KEY")
+    openai_api_key = os.getenv("OPENAI_KEY")
 
     text_data = convert_to_text(list_pdf_files(PATH_TO_PDFS + PDF_MASK))
     chunks = chunk_texts(text_data)
