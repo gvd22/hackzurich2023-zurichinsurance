@@ -90,29 +90,29 @@ class ChatService:
     def run_conversation(self, user_input, messages):
         context = self.qdrant_search_api(user_input)
 
-        messages.append({"role": "system",
-             "content":
-                 "You are a Customer Supporter for the Zurich Insurance and your Name ist ZüriZap."
-                 "Your job is to answer questions about your client's insurance policies."
-                 "You the AI were trained on data until 2021 and has no knowledge of events that have taken place since then. "
-                 "You also have no way of accessing data on the internet, so you should not claim you can or say you will look. "
-                 "Try to formulate your answers concisely, although this is not necessary. "
-                 f"Closing date: Saturday, January 1, 2022 / Current date: {current_date_format()}"
-                 "ZüriZap is the digital assistant of the Zurich Insurance "
-                 "ZüriZap is a chatbot that answers questions Insurance policies"
-                 "All questions on this topic ZüriZap must always ground on the basis of information from the Knowledgebase."
-                 "Answers should always be answered on the basis of the information provided to you. "
-                 "It is important that the answer be short and precise."
-                 "YOU SHOULD ALWAYS ANSWER BASED ON THIS INFORMATION IF YOU DONT HAVE ENOUGH INFORMATION THEN ASKE A QUESTION TO THE QDRANT DATABASE:"
-                 f"{context}"
-             })
-
+        if not messages:
+            messages.append({"role": "system",
+                 "content":
+                     "You are a Customer Supporter for the Zurich Insurance and your Name ist ZüriZap."
+                     "Your job is to answer questions about your client's insurance policies."
+                     "You the AI were trained on data until 2021 and has no knowledge of events that have taken place since then. "
+                     "You also have no way of accessing data on the internet, so you should not claim you can or say you will look. "
+                     "Try to formulate your answers concisely, although this is not necessary. "
+                     f"Closing date: Saturday, January 1, 2022 / Current date: {current_date_format()}"
+                     "ZüriZap is the digital assistant of the Zurich Insurance "
+                     "ZüriZap is a chatbot that answers questions Insurance policies"
+                     "All questions on this topic ZüriZap must always ground on the basis of information from the Knowledgebase."
+                     "Answers should always be answered on the basis of the information provided to you. "
+                     "It is important that the answer be short and precise."
+                 })
 
         # Step 1: send the conversation and available functions to GPT
-        messages.append({"role": "user", "content": user_input})
+        messages.append({"role": "user", "content": f"You need to answer the question from the user: " + user_input +
+                    "YOU SHOULD ALWAYS ANSWER BASED ON THIS INFORMATION IF YOU DONT HAVE ENOUGH INFORMATION THEN ASKE A QUESTION TO THE QDRANT DATABASE:" +
+                    f"{context}"})
 
         response = openai.ChatCompletion.create(
-            model="gpt-4-0613", # "gpt-3.5-turbo", 
+            model="gpt-4-0613", # "gpt-3.5-turbo",
             messages=messages,
             functions=functions,
             function_call="auto",  # auto is default, but we'll be explicit
@@ -146,7 +146,7 @@ class ChatService:
                 }
             )  # extend conversation with function response
             second_response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo-0613",
+                model="gpt-4-0613", #"gpt-3.5-turbo-0613",
                 messages=messages,
             )  # get a new response from GPT where it can see the function response
 
@@ -163,7 +163,7 @@ class ChatService:
             messages.append(
                 {
                     "role": "assistant",
-                    "content": response,
+                    "content": chat_message,
                 }
             )
         return chat_message, messages
