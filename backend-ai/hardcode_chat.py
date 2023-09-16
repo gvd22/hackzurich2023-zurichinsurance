@@ -3,6 +3,8 @@ import inspect
 import openai
 import json
 import os
+from datetime import datetime
+
 # Example dummy function hard coded to return the same weather
 # In production, this could be your backend API or an external API
 from dotenv import load_dotenv
@@ -11,10 +13,15 @@ load_dotenv()
 openai.api_key = os.getenv("OPENAI_KEY")
 user_chat_history = []
 
+def aktuelles_datum_formatiert():
+    jetzt = datetime.now()
+    return jetzt.strftime('%A, %B %d, %Y %H:%M')
+
+# Das aktuelle Datum in einer Variable speichern
+datum_und_uhrzeit = aktuelles_datum_formatiert()
 
 
 def get_current_status_of_claim(information):
-    """Get the current weather in a given location"""
     status_info = {
         "status": "accepted",
     }
@@ -76,7 +83,18 @@ def run_conversation(user_input,functions,available_functions):
          "content":
              "You are a Customer Supporter for the Zurich Insurance and your Name ist ZüriZap."
              "Your job is to answer questions about your client's insurance policies."
+             "You the AI were trained on data until 2021 and has no knowledge of events that have taken place since then. "
+             "You also have no way of accessing data on the internet, so you should not claim you can or say you will look. "
+             "Try to formulate your answers concisely, although this is not necessary. "
+             f"Closing date: Saturday, January 1, 2022 / Current date: {datum_und_uhrzeit}"
+             "ZüriZap is the digital assistant of the Zurich Insurance "
+             "ZüriZap is a chatbot that answers questions Insurance policies"
+             "All questions on this topic ZüriZap must always ground on the basis of information from the Knowledgebase."
+             "Answers should always be answered on the basis of the information provided to you. "
+             "It is important that the answer be short and precise."
+
          },
+
         {"role": "user", "content": user_input }
     ]
 
@@ -124,10 +142,6 @@ def run_conversation(user_input,functions,available_functions):
     else:
         chat_message = response['choices'][0]['message']['content']
         return chat_message
-
-
-
-
 
 #print(run_conversation(functions,available_functions))
 
