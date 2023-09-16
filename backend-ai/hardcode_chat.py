@@ -117,13 +117,12 @@ available_functions = {
             "get_current_status_of_claim": get_current_status_of_claim,
         }
 
-
+messages = []
 
 def run_conversation(user_input,functions,available_functions):
     context = qdrant_search_api(user_input)
 
-    messages = [
-        {"role": "system",
+    messages.append({"role": "system",
          "content":
              "You are a Customer Supporter for the Zurich Insurance and your Name ist ZüriZap."
              "Your job is to answer questions about your client's insurance policies."
@@ -138,8 +137,8 @@ def run_conversation(user_input,functions,available_functions):
              "It is important that the answer be short and precise."
              "YOU SHOULD ALWAYS ANSWER BASED ON THIS INFORMATION IF YOU DONT HAVE ENOUGH INFORMATION THEN ASKE A QUESTION TO THE QDRANT DATABASE:"
              f"{context}"
-         },
-    ]
+         })
+
 
     # Step 1: send the conversation and available functions to GPT
     messages.append({"role": "user", "content": user_input})
@@ -184,9 +183,21 @@ def run_conversation(user_input,functions,available_functions):
         )  # get a new response from GPT where it can see the function response
 
         response = second_response['choices'][0]['message']['content']
+        messages.append(
+            {
+                "role": "assistant",
+                "content": response,
+            }
+        )
         return response
     else:
         chat_message = response['choices'][0]['message']['content']
+        messages.append(
+            {
+                "role": "assistant",
+                "content": response,
+            }
+        )
         return chat_message
 
 #print(run_conversation(functions,available_functions))
@@ -196,11 +207,12 @@ def chatbot():
     print("Bot: Hey I'm ZüriZap how can I help you?")
     user_input = input("User: ")
     user_chat_history.append({"role": "assistant", "content": "Hey I'm ZüriZap how can I help you?" })
+    user_chat_history.append({"role": "user", "content": user_input})
 
     while True:
-        user_chat_history.append({"role": "user", "content": user_input})
         print("Bot: ", end="")
         print(run_conversation(user_input,functions,available_functions))
+
         user_input = input("User:")
 
 
