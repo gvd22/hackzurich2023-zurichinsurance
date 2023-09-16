@@ -1,55 +1,24 @@
-import os
-import openai
-
-import math
-import pytz
-from datetime import datetime
 import inspect
+
+import openai
 import json
-import datetime
-import tiktoken
+import os
+# Example dummy function hard coded to return the same weather
+# In production, this could be your backend API or an external API
 from dotenv import load_dotenv
 load_dotenv()
 
 openai.api_key = os.getenv("OPENAI_KEY")
+user_chat_history = []
 
 
 
-
-# Globale Variablen
-result = ''
-chat_user = []
-context =""
-
-
-def calculator(num1, num2, operator):
-    if operator == '+':
-        return str(num1 + num2)
-    elif operator == '-':
-        return str(num1 - num2)
-    elif operator == '*':
-        return str(num1 * num2)
-    elif operator == '/':
-        return str(num1 / num2)
-    elif operator == '**':
-        return str(num1 ** num2)
-    elif operator == 'sqrt':
-        return str(math.sqrt(num1))
-    else:
-        return "Invalid operator"
-
-def get_current_time(location):
-    try:
-        # Get the timezone for the city
-        timezone = pytz.timezone(location)
-
-        # Get the current time in the timezone
-        now = datetime.now(timezone)
-        current_time = now.strftime("%I:%M:%S %p")
-
-        return current_time
-    except:
-        return "Sorry, I couldn't find the timezone for that location."
+def get_current_status_of_claim(information):
+    """Get the current weather in a given location"""
+    status_info = {
+        "status": "accepted",
+    }
+    return json.dumps(status_info)
 
 def check_args(function, args):
     sig = inspect.signature(function)
@@ -67,90 +36,112 @@ def check_args(function, args):
     return True
 
 functions = [
-        {
-            "name": "get_current_time",
-            "description": "Die aktuelle Zeit zu erhalten an einem gewissen Ort",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "location": {
-                        "type": "string",
-                        "description": "The location name. The pytz is used to get the timezone for that location. Location names should be in a format like America/New_York, Asia/Bangkok, Europe/London",
-                    }
+    {
+        "name": "get_current_status_of_claim",
+        "description": "Get the current Status for the claim from the user",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "information": {
+                    "type": "string",
                 },
-                "required": ["location"],
             },
+            "required": ["information"],
         },
-        {
-            "name": "calculator",
-            "description": "Ein simpler Taschenrechner um simple arithmetische operationen auszuführen",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "num1": {"type": "number"},
-                    "num2": {"type": "number"},
-                    "operator": {"type": "string", "enum": ["+", "-", "*", "/", "**", "sqrt"]},
+    },
+    {
+        "name": "get_data_from_qdrant",
+        "description": "",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "question": {
+                    "type": "string",
                 },
-                "required": ["num1", "num2", "operator"],
             },
+            "required": ["question"],
         },
+    }
 ]
 
 available_functions = {
-    "get_current_time": get_current_time,
-    "calculator": calculator,
-}
+            "get_current_status_of_claim": get_current_status_of_claim,
+        }
 
-def first_think_llm(user, functions, available_functions):
-    history = '\n'.join([f"{message['role']}: {message['content']}" for message in chat_user])
 
+def run_conversation(user_input,functions,available_functions):
+    # Step 1: send the conversation and available functions to GPT
     messages = [
         {"role": "system",
          "content":
              "You are a Customer Supporter for the Zurich Insurance and your Name ist ZüriZap."
              "Your job is to answer questions about your client's insurance policies."
-             "YOU SHOULD USE THE INFORMATION BELOW TO ANSER THE QUESTION FROM THE USER:"
-             f"{context}"
-             f"HERE YOU FIND THE HISTORY FROM THE CHAT"
-             f"{history}"
-             },
-        {"role": "user", "content":
-            f""
-            f"First you have to decide whether you may answer the following question of the: {user}. "
-            f"You may only answer questions on the topic Insurance Policies and Zurich Insurance"
-         }
+         },
+        {"role": "user", "content": user_input }
     ]
 
-    # Erstellt eine Text Completion mit OpenAI
     response = openai.ChatCompletion.create(
-        engine="gpt-4-0613",
+        model="gpt-3.5-turbo-0613",
         messages=messages,
         functions=functions,
-        function_call="auto",
-        temperature = 0.5,
-        max_tokens = 8000,
-        top_p = 1,
-        frequency_penalty = 0,
-        presence_penalty = 0,
-        stop = None,
-
+        function_call="auto",  # auto is default, but we'll be explicit
     )
-    chat_message = response['choices'][0]['message']['content']
+    response_message = response["choices"][0]["message"]
 
-    return chat_message
+    # Step 2: check if GPT wanted to call a function
+    if response_message.get("function_call"):
+        # Step 3: call the function
+        # Note: the JSON response may not always be valid; be sure to handle errors
+          # only one function in this example, but you can have multiple
+        function_name = response_message["function_call"]["name"]
+
+        if function_name not in available_functions:
+            return "Function " + function_name + " does not exist"
+        function_to_call = available_functions[function_name]
+
+        # verify function has correct number of arguments
+        function_args = json.loads(response_message["function_call"]["arguments"])
+        if check_args(function_to_call, function_args) is False:
+            return "Invalid number of arguments for function: " + function_name
+        function_response = function_to_call(**function_args)
+
+        # Step 4: send the info on the function call and function response to GPT
+        messages.append(response_message)  # extend conversation with assistant's reply
+        messages.append(
+            {
+                "role": "function",
+                "name": function_name,
+                "content": function_response,
+            }
+        )  # extend conversation with function response
+        second_response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo-0613",
+            messages=messages,
+        )  # get a new response from GPT where it can see the function response
+
+        response = second_response['choices'][0]['message']['content']
+        return response
+    else:
+        chat_message = response['choices'][0]['message']['content']
+        return chat_message
 
 
+
+
+
+#print(run_conversation(functions,available_functions))
 
 def chatbot():
 
-    user = input("Bot: Hey I'm ZüriZap how can I help you??\nUser: ")
-    chat_user.append({"role": "assistant", "content": "Hey I'm ZüriZap how can I help you?" })
+    print("Bot: Hey I'm ZüriZap how can I help you?")
+    user_input = input("User: ")
+    user_chat_history.append({"role": "assistant", "content": "Hey I'm ZüriZap how can I help you?" })
 
     while True:
-        chat_user.append({"role": "user", "content": user})
-        print("Bot: " + first_think_llm(user,functions,available_functions) )
-        user = input("\nUser:")
+        user_chat_history.append({"role": "user", "content": user_input})
+        print("Bot: ", end="")
+        print(run_conversation(user_input,functions,available_functions))
+        user_input = input("User:")
 
 
-# Durchführung der Funktionen
 chatbot()
