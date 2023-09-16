@@ -7,3 +7,4 @@ class Insurance(BaseModel):
     name: str
     price: float
     type: str
+    starting_date: str

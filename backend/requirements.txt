@@ -2,3 +2,7 @@ fastapi~=0.101.0
 pydantic~=2.1.1
 websockets~=11.0.3
 uvicorn[standard]==0.17.*
+qdrant-client~=1.5.4
+openai~=0.28.0
+langchain~=0.0.292
+tiktoken~=0.5.1
