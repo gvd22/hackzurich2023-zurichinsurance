@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Message from "./Message";
-import InputBox from "./Inputbox";
+import InputBox from "./InputBox";
 import { FcAssistant } from "react-icons/fc";
 import BotImage from "../../assets/botAvatar.png";
 import { Avatar } from "@material-tailwind/react";
@@ -15,7 +15,7 @@ const Chat = () => {
   const [ws, setWs] = useState(null);
   useEffect(() => {
     const socket = new WebSocket(
-      "ws://hackzurich23-backend-emcg5a6iia-oa.a.run.app/ws"
+      "wss://hackzurich23-backend-emcg5a6iia-oa.a.run.app/ws"
     );
 
     socket.onopen = () => {
