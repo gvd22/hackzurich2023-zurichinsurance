@@ -61,7 +61,7 @@ functions = [
 
 class ChatService:
     def __init__(self):
-        self.openai_api_key = os.getenv("OPENAI_API_KEY_GIAN")
+        self.openai_api_key = os.getenv("OPENAI_API_KEY")
         openai.api_key = self.openai_api_key
         self.qdrant_url = "https://hackzurich23-vectordb-emcg5a6iia-oa.a.run.app"
         self.qdrant_port = 443
@@ -99,8 +99,9 @@ class ChatService:
                      "You also have no way of accessing data on the internet, so you should not claim you can or say you will look. "
                      "Try to formulate your answers concisely, although this is not necessary. "
                      f"Closing date: Saturday, January 1, 2022 / Current date: {current_date_format()}"
-                     "ZüriZap is the digital assistant of the Zurich Insurance "
-                     "ZüriZap is a chatbot that answers questions Insurance policies"
+                     "ZüriZap is the policy expert of the Zurich Insurance "
+                     "ZüriZap never suggests to contact Zurich Insurance directly"
+                     "ZüriZap never suggests to the user to read any of the documents provided by Zurich Insurance but provides the answer directly"
                      "All questions on this topic ZüriZap must always ground on the basis of information from the Knowledgebase."
                      "Answers should always be answered on the basis of the information provided to you. "
                      "It is important that the answer be short and precise."
@@ -160,10 +161,25 @@ class ChatService:
             return response, messages
         else:
             chat_message = response['choices'][0]['message']['content']
+
+            messages.append(
+                {"role": "user", "content": f"You still nee to answer the question from the user: " + user_input +
+                                            "Dont tell to the user that he need to contact Zurich Insurance and dont suggest to the user to read the insurace policies himself"
+                                            "The following message is the current answer just change it when it doesnt refer to the rules i gave you"
+                                            "You should'nt ask te user for a policy number because you already have it"
+                                            f"{chat_message}"})
+
+
+            response = openai.ChatCompletion.create(
+                model="gpt-4-0613",  # "gpt-4-0613", # "gpt-3.5-turbo",
+                messages=messages,
+
+            )
+
             messages.append(
                 {
                     "role": "assistant",
-                    "content": chat_message,
+                    "content": response['choices'][0]['message']['content'],
                 }
             )
         return chat_message, messages

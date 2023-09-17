@@ -6,8 +6,16 @@ from insurance import Insurance
 from ticket import Ticket
 from ticket_service import TicketServiceInstance
 from chat_service import ChatService
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 ticket_service = TicketServiceInstance
 chat_service = ChatService()
 
