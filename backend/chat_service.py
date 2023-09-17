@@ -31,16 +31,16 @@ def check_args(function, args):
 
 functions = [
     {
-        "name": "get_ticket_by_name",
+        "name": "get_current_status_of_claim",
         "description": "Get prior claim from the user by name",
         "parameters": {
             "type": "object",
             "properties": {
-                "name": {
+                "ticket_name": {
                     "type": "string",
                 },
             },
-            "required": ["name"],
+            "required": ["ticket_name"],
         },
     },
     {
@@ -49,11 +49,11 @@ functions = [
         "parameters": {
             "type": "object",
             "properties": {
-                "question": {
+                "search_question": {
                     "type": "string",
                 },
             },
-            "required": ["question"],
+            "required": ["search_question"],
         },
     }
 ]
@@ -61,7 +61,7 @@ functions = [
 
 class ChatService:
     def __init__(self):
-        self.openai_api_key = os.getenv("OPENAI_API_KEY")
+        self.openai_api_key = os.getenv("OPENAI_API_KEY_GIAN")
         openai.api_key = self.openai_api_key
         self.qdrant_url = "https://hackzurich23-vectordb-emcg5a6iia-oa.a.run.app"
         self.qdrant_port = 443
@@ -112,7 +112,7 @@ class ChatService:
                     f"{context}"})
 
         response = openai.ChatCompletion.create(
-            model="gpt-4-0613", # "gpt-3.5-turbo",
+            model="gpt-3.5-turbo-0613", #"gpt-4-0613", # "gpt-3.5-turbo",
             messages=messages,
             functions=functions,
             function_call="auto",  # auto is default, but we'll be explicit

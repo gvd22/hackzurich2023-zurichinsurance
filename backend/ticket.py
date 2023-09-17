@@ -8,3 +8,6 @@ class Ticket(BaseModel):
     type: str
     description: str
     status: str = "Pending"
+
+    def dump(self):
+        return "Ticket: " + self.name + "\n" + "Type: " + self.type + "\n" + "Description: " + self.description + "\n" + "Status: " + self.status + "\n"
