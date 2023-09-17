@@ -17,6 +17,7 @@ export default withMT({
       lightPurple: "#5454c0",
       activeColor: "#7272c5",
       cardBg: "#8f81e6",
+      headerBg: "#0F0C36",
     },
   },
   plugins: [],
